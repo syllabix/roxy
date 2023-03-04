@@ -1,9 +1,7 @@
-use std::error::Error;
-
-
 #[tokio::main]
 async fn main() {
+    roxy::logger::init();
     if let Err(e) = roxy::run().await {
-        log::error!("something went wrong: {}", e)
+        log::error!("{}", e)
     }
 }

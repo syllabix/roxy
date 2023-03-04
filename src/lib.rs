@@ -5,24 +5,25 @@
 //! process network traffic and forward it to another destintion on your development
 //! machine
 //!
+pub mod logger;
 mod controller;
 mod proxy;
 
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use env_logger::Env;
-use log::LevelFilter;
-use std::{convert::Infallible, ops::Add};
+use std::error::Error;
+
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)] // Read from `Cargo.toml`
+#[command(version, about, long_about = None)] // Read from `Cargo.toml`
 #[command(propagate_version = true)]
-struct Commander {
+struct Arguments {
     #[command(subcommand)]
-    command: Commands,
+    command: Command,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+enum Command {
     /// Start up the local development proxy
     Start(StartArgs),
     /// Add various entities to a running proxy
@@ -31,8 +32,14 @@ enum Commands {
 
 #[derive(Args, Debug)]
 struct StartArgs {
-    #[arg(default_value_t = 3128)]
+    #[arg(short, long, default_value_t = 3128)]
     port: u16,
+}
+
+impl From<&StartArgs> for proxy::Arguments {
+    fn from(value: &StartArgs) -> Self {
+        Self { port: value.port }
+    }
 }
 
 #[derive(Clone, ValueEnum)]
@@ -45,27 +52,25 @@ enum Entity {
     Certificate
 }
 
-pub async fn run() -> Result<(), Infallible> {
-    env_logger::builder().filter_level(LevelFilter::Info).init();
-
-    let args = Commander::parse();
+pub async fn run() -> Result<(), Box<dyn Error>> {
+    let args = Arguments::parse();
 
     match &args.command {
-        Commands::Start(args) => {
-            log::info!("starting up the proxy with args {:?}", args);
+        Command::Start(args) => {
+            proxy::start(args.into()).await?;
             Ok(())
         }
-        Commands::Add { entity } => match entity {
+        Command::Add { entity } => match entity {
             Entity::Route => {
-                log::info!("add route");
+                log::info!("todo: implement add route");
                 Ok(())
             },
             Entity::Plugin => {
-                log::info!("add plugin");
+                log::info!("todo: implement add plugin");
                 Ok(())
             },
             Entity::Certificate => {
-                log::info!("add certificate");
+                log::info!("todo: implement add certificate");
                 Ok(())
             },
         },

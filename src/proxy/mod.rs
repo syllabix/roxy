@@ -4,32 +4,54 @@
 //! roxy web proxy
 //!
 
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use hyper::{Body, Request, Response, Server};
-use hyper::service::{make_service_fn, service_fn};
+use thiserror::Error;
 
-
-pub async fn start() {
-    // We'll bind to 127.0.0.1:3000
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-
-    // A `Service` is needed for every connection, so this
-    // creates one from our `hello_world` function.
-    let make_svc = make_service_fn(|_conn| async {
-        // service_fn converts our function into a `Service`
-        Ok::<_, Infallible>(service_fn(hello_world))
-    });
-
-    let server = Server::bind(&addr).serve(make_svc);
-
-    // Run this server for... forever!
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("The proxy failed to start: {0}")]
+    CouldNotStart(String),
+    #[error("The proxy terminated unexpectedly: {0}")]
+    BadExit(String),
 }
 
+pub struct Arguments {
+    pub port: u16,
+}
 
-async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+pub async fn start(args: Arguments) -> Result<(), Error> {
+    let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
+
+    let make_svc = make_service_fn(|_conn| async {
+        Ok::<_, Infallible>(service_fn(ping))
+    });
+
+    let server = match Server::try_bind(&addr) {
+        Ok(server) => server,
+        Err(e) => return Err(Error::CouldNotStart(e.to_string())),
+    };
+
+    let server = server
+        .serve(make_svc)
+        .with_graceful_shutdown(shutdown_signal());
+
+    log::info!("proxy started and listening @ {}", addr.to_string());
+
+    // Await the `server` receiving the signal...
+    if let Err(e) = server.await {
+        return Err(Error::BadExit(e.to_string()));
+    }
+
+    Ok(())
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c().await.err();
+}
+
+async fn ping(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new("roxy is local dev proxy that rox!".into()))
 }
