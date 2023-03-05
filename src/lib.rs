@@ -9,10 +9,8 @@ pub mod logger;
 mod controller;
 mod proxy;
 
-
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::error::Error;
-
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)] // Read from `Cargo.toml`

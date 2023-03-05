@@ -6,6 +6,7 @@
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
+use hyper_tls::HttpsConnector;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use thiserror::Error;
@@ -23,18 +24,14 @@ pub struct Arguments {
 }
 
 pub async fn start(args: Arguments) -> Result<(), Error> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
 
     let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(ping))
+        Ok::<_, Infallible>(service_fn(reverse_proxy))
     });
 
-    let server = match Server::try_bind(&addr) {
-        Ok(server) => server,
-        Err(e) => return Err(Error::CouldNotStart(e.to_string())),
-    };
-
-    let server = server
+    let server = Server::try_bind(&addr)
+        .map_err(|e| Error::CouldNotStart(e.to_string()))?
         .serve(make_svc)
         .with_graceful_shutdown(shutdown_signal());
 
@@ -52,6 +49,24 @@ async fn shutdown_signal() {
     tokio::signal::ctrl_c().await.err();
 }
 
-async fn ping(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new("roxy is local dev proxy that rox!".into()))
+async fn reverse_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let https = HttpsConnector::new();
+
+    let mut builder = Request::builder()
+        .uri("https://httpbin.org/anything");
+    for (key, value) in req.headers().iter() {
+        builder = builder.header(key.as_str(), value.as_bytes());
+    }
+    let body = req.into_body();
+    let proxy_req = builder.body(body)
+        .map_err(|e| Error::BadExit(e.to_string()))?;
+
+    log::info!("Proxy request: {:?}", &proxy_req);
+    let proxy_resp = hyper::Client::builder()
+        .build(https)
+        .request(proxy_req)
+        .await
+        .unwrap();
+    log::info!("Response: {:?}", &proxy_resp);
+    Ok(proxy_resp)
 }
