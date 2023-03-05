@@ -7,6 +7,9 @@ about = "a local development proxy that rocks!"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = { version = "0.6.10" }   # Used for control server
+serde = { version = "1.0.152", features = ["derive"]}
+
 hyper = { version = "0.14.24", features = ["full"] }
 hyper-tls = "0.5.0"
 tokio = { version = "1.25.0", features = ["full"] }
