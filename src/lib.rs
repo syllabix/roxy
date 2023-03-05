@@ -7,7 +7,7 @@
 //!
 pub mod logger;
 mod controller;
-pub mod proxy;
+mod proxy;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::error::Error;

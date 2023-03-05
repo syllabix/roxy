@@ -24,7 +24,7 @@ pub struct Arguments {
 }
 
 pub async fn start(args: Arguments) -> Result<(), Error> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
 
     let make_svc = make_service_fn(|_conn| async {
         Ok::<_, Infallible>(service_fn(reverse_proxy))
