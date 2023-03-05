@@ -7,6 +7,7 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use hyper_tls::HttpsConnector;
+use tokio::task::JoinHandle;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use thiserror::Error;
@@ -23,7 +24,7 @@ pub struct Arguments {
     pub port: u16,
 }
 
-pub async fn start(args: Arguments) -> Result<(), Error> {
+pub async fn start(args: Arguments) -> Result<JoinHandle<()>, Error> {
     let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
 
     let make_svc = make_service_fn(|_conn| async {
@@ -35,14 +36,15 @@ pub async fn start(args: Arguments) -> Result<(), Error> {
         .serve(make_svc)
         .with_graceful_shutdown(shutdown_signal());
 
-    log::info!("proxy started and listening @ {}", addr.to_string());
+    let handle = tokio::spawn(async move {
+        log::info!("proxy started and listening @ {}", addr.to_string());
+        // Await the `server` receiving the signal...
+        if let Err(e) = server.await {
+            log::info!("Server exiting with error: {}", e)
+        }
+    });
 
-    // Await the `server` receiving the signal...
-    if let Err(e) = server.await {
-        return Err(Error::BadExit(e.to_string()));
-    }
-
-    Ok(())
+    Ok(handle)
 }
 
 async fn shutdown_signal() {

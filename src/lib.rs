@@ -40,6 +40,12 @@ impl From<&StartArgs> for proxy::Arguments {
     }
 }
 
+impl From<&StartArgs> for controller::server::ControlServerArgs {
+    fn from(value: &StartArgs) -> Self {
+        Self { port: value.port }
+    }
+}
+
 #[derive(Clone, ValueEnum)]
 enum Entity {
     /// Add a route to the proxy
@@ -55,6 +61,7 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
 
     match &args.command {
         Command::Start(args) => {
+            controller::server::start_server(args.into()).await?;
             proxy::start(args.into()).await?;
             Ok(())
         }
