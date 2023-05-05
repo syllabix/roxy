@@ -7,10 +7,10 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use hyper_tls::HttpsConnector;
-use tokio::task::JoinHandle;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use thiserror::Error;
+use tokio::task::JoinHandle;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -27,9 +27,8 @@ pub struct Arguments {
 pub async fn start(args: Arguments) -> Result<JoinHandle<()>, Error> {
     let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
 
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(reverse_proxy))
-    });
+    let make_svc =
+        make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(reverse_proxy)) });
 
     let server = Server::try_bind(&addr)
         .map_err(|e| Error::CouldNotStart(e.to_string()))?
@@ -54,13 +53,13 @@ async fn shutdown_signal() {
 async fn reverse_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
     let https = HttpsConnector::new();
 
-    let mut builder = Request::builder()
-        .uri("https://httpbin.org/anything");
+    let mut builder = Request::builder().uri("https://httpbin.org/anything");
     for (key, value) in req.headers().iter() {
         builder = builder.header(key.as_str(), value.as_bytes());
     }
     let body = req.into_body();
-    let proxy_req = builder.body(body)
+    let proxy_req = builder
+        .body(body)
         .map_err(|e| Error::BadExit(e.to_string()))?;
 
     log::info!("Proxy request: {:?}", &proxy_req);

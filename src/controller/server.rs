@@ -1,10 +1,7 @@
-use std::{
-    io::Error,
-    net::SocketAddr,
-    sync::{Arc, RwLock, Mutex}, pin::Pin
-};
+use std::{io::Error, net::SocketAddr, pin::Pin, sync::Arc};
+use tokio::sync::Mutex;
 
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::post, Json, Router, Server};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
@@ -30,6 +27,11 @@ pub async fn start_server(args: ControlServerArgs) -> Result<(), Error> {
         .route("/proxy", post(start_proxy))
         .with_state(controller);
 
+    Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+
     Ok(())
 }
 
@@ -42,10 +44,10 @@ async fn start_proxy(
     State(proxy_status): State<SharedProxyState>,
     Json(input): Json<StartProxy>,
 ) -> Result<Json<StartProxy>, StatusCode> {
-    let mut status = proxy_status.lock().unwrap();
+    let mut status = proxy_status.lock().await;
 
     if status.handle.is_none() {
-        let new_handle = proxy::start(proxy::Arguments { port: input.port})
+        let new_handle = proxy::start(proxy::Arguments { port: input.port })
             .await
             .map_err(|e| StatusCode::PRECONDITION_FAILED)?;
         status.handle = Some(Box::pin(new_handle));
